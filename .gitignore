@@ -39,3 +39,29 @@
 
 # debug information files
 *.dwo
+
+# Claude's files
+.claude/
+CLAUDE.md
+
+# Visual Studio 2026
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docview
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# CMake
+build/
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CMakeSettings.json
+
+# Dependencies fetched by CMake
+_deps/
