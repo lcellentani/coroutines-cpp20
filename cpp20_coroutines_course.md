@@ -116,7 +116,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
-| 1.1 | What is a coroutine? The "bookmarkable function" mental model | S01 | ⬜ Not started |
+| 1.1 | What is a coroutine? The "bookmarkable function" mental model | S01 | ✅ Completed |
 | 1.2 | The three keywords: `co_await`, `co_yield`, `co_return` | S02 | ⬜ Not started |
 | 1.3 | Stack frames vs. coroutine frames — where does the state live? | S03 | ⬜ Not started |
 | 1.4 | **Exercise:** Trace the execution flow of a basic generator | S04 | ⬜ Not started |
@@ -189,6 +189,31 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 
 **Next session:** S01 — *What is a coroutine? The "bookmarkable function" mental model.*
 Load this project file and paste: `"Starting S01 from the beginning."`
+
+---
+
+### S01 — What is a coroutine? The "bookmarkable function" mental model
+**Date:** 2026-04-19
+**Curriculum:** 1.1 (conceptual mapping + keyword overview)
+**Status:** ✅ Complete
+
+**Completed:**
+- Coroutine mental model: state survives suspension, frame lives on the heap
+- The three keywords: co_yield, co_await, co_return — inference rule
+- Built SimpleGenerator with correct next() guard and const value()
+- Implemented fibonacci() coroutine with range parameters
+- Investigated Option 3: fibonacci_state_at(int index) as a plain function
+- Fixed index-as-value bug in first fibonacci_state_at attempt
+- Wired up fibonacci_state_at + fibonacci coroutine cleanly in main()
+
+**Key takeaways:**
+- A function becomes a coroutine by inference — no keyword, just co_yield/co_await/co_return in the body
+- Coroutine local state lives in a heap-allocated frame, survives every suspension
+- If a helper function never needs to suspend, it should be a plain function — not a coroutine
+- Coroutines should express flow, not policy — push starting-state decisions to the caller
+
+**Next session:** S02 — The three keywords in depth: co_await, co_yield, co_return
+Load project file and paste: "Starting S02 from the beginning."
 
 ---
 
