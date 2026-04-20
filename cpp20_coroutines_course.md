@@ -117,7 +117,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
 | 1.1 | What is a coroutine? The "bookmarkable function" mental model | S01 | ✅ Completed |
-| 1.2 | The three keywords: `co_await`, `co_yield`, `co_return` | S02 | ⬜ Not started |
+| 1.2 | The three keywords: `co_await`, `co_yield`, `co_return` | S02 | ✅ Not started |
 | 1.3 | Stack frames vs. coroutine frames — where does the state live? | S03 | ⬜ Not started |
 | 1.4 | **Exercise:** Trace the execution flow of a basic generator | S04 | ⬜ Not started |
 
@@ -214,6 +214,31 @@ Load this project file and paste: `"Starting S01 from the beginning."`
 
 **Next session:** S02 — The three keywords in depth: co_await, co_yield, co_return
 Load project file and paste: "Starting S02 from the beginning."
+
+---
+
+### S02 — The Three Keywords: co_await, co_yield, co_return
+**Date:** 2026-04-20
+**Curriculum:** 1.2
+**Status:** ✅ Complete
+
+**Completed:**
+- Explained the three keywords: co_yield (outbound pause), co_await (inbound pause), co_return (exit)
+- Covered the co_yield desugaring: co_yield expr → co_await promise.yield_value(expr)
+- Covered the compiler transformation: suspended coroutine as a state machine with a heap-allocated frame
+- Task 1: instrumented yield_value with logging — pull model interleaving made visible
+- Task 2: switched from return_void to return_value(std::string); stored final message in promise via std::optional; exposed via summary() with assert(handle.done()) guard
+- Task 3: generalised SimpleGenerator into Generator<T>; implemented summarize() using all three keywords; confirmed co_await std::suspend_never{} is a runtime no-op
+
+**Key takeaways:**
+- co_yield desugars to co_await on the promise — yield behavior is fully user-defined
+- co_await suspend_never: await_ready() returns true, suspension is skipped entirely, no control transfer
+- std::optional used as "not yet set" sentinel has a design smell: callers cannot distinguish "not finished" from "no value"; assert on handle.done() is the right guard
+- Generator<T> hardcodes TReturn as std::string — a second template parameter TReturn would make it fully general
+- Dead code (SimpleGenerator) should be deleted once superseded
+
+**Next session:** S03 — Stack frames vs. coroutine frames: where does the state live?
+Load project file and paste: "Starting S03 from the beginning."
 
 ---
 
