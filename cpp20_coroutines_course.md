@@ -117,8 +117,8 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
 | 1.1 | What is a coroutine? The "bookmarkable function" mental model | S01 | ✅ Completed |
-| 1.2 | The three keywords: `co_await`, `co_yield`, `co_return` | S02 | ✅ Not started |
-| 1.3 | Stack frames vs. coroutine frames — where does the state live? | S03 | ⬜ Not started |
+| 1.2 | The three keywords: `co_await`, `co_yield`, `co_return` | S02 | ✅ Completed |
+| 1.3 | Stack frames vs. coroutine frames — where does the state live? | S03 | ✅ Completed |
 | 1.4 | **Exercise:** Trace the execution flow of a basic generator | S04 | ⬜ Not started |
 
 ---
@@ -239,6 +239,51 @@ Load project file and paste: "Starting S02 from the beginning."
 
 **Next session:** S03 — Stack frames vs. coroutine frames: where does the state live?
 Load project file and paste: "Starting S03 from the beginning."
+
+---
+
+### S03 — Stack frames vs. coroutine frames — where does the state live?
+**Date:** 2026-04-22
+**Curriculum:** 1.3
+**Status:** ✅ Complete
+
+**Completed:**
+- Explained the difference between stack frames and coroutine frames,
+  exploring how functions and coroutines handle context allocation
+  differently.
+- Contrasted the stack model and the heap model to see in practice where
+  functions and coroutines diverge in context management.
+- Explored the conceptual model the compiler generates when transforming
+  a coroutine into a heap-allocated state machine.
+- Task 1: Tracked frame allocation and deallocation timing by overriding
+  operator new/delete on the promise type. Confirmed the frame is
+  allocated at coroutine construction and freed only at handle.destroy(),
+  decoupled from any call stack lifetime.
+- Task 2: Verified in practice how frame size grows in relation to the
+  presence or absence of locals that survive a suspension point.
+- Task 3: Reproduced the dangling reference trap — passing a const ref to
+  a temporary that is destroyed before the coroutine resumes. Observed
+  silent UB (empty string output) in a Debug build.
+
+**Key takeaways:**
+- The heap is the mechanism; handle.destroy() is the policy. The RAII
+  destructor enforces that policy. The call stack that created the
+  coroutine has no claim on when the frame dies.
+- Locals that cross a suspension point are promoted into the coroutine
+  frame and cost frame space. Locals that don't cross a suspension point
+  may remain on the stack (compiler-dependent; more likely in optimized
+  builds).
+- LIFO destruction order applies to the Generator handles in main() —
+  last constructed, first destroyed — because they are ordinary local
+  variables. This is standard C++, not a coroutine-specific rule.
+- Coroutine parameters need special attention when references are
+  involved. What is copied into the frame is the reference itself, not
+  the referent. If the referent's lifetime ends while the coroutine is
+  suspended, the reference dangles. Fix: take by value so the frame owns
+  the data.
+
+**Next session:** S04 — Exercise: Trace the execution flow of a basic generator
+Load project file and paste: "Starting S04 from the beginning."
 
 ---
 
