@@ -119,7 +119,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 1.1 | What is a coroutine? The "bookmarkable function" mental model | S01 | ✅ Completed |
 | 1.2 | The three keywords: `co_await`, `co_yield`, `co_return` | S02 | ✅ Completed |
 | 1.3 | Stack frames vs. coroutine frames — where does the state live? | S03 | ✅ Completed |
-| 1.4 | **Exercise:** Trace the execution flow of a basic generator | S04 | ⬜ Not started |
+| 1.4 | **Exercise:** Trace the execution flow of a basic generator | S04 | ✅ Completed |
 
 ---
 
@@ -199,21 +199,21 @@ Load this project file and paste: `"Starting S01 from the beginning."`
 
 **Completed:**
 - Coroutine mental model: state survives suspension, frame lives on the heap
-- The three keywords: co_yield, co_await, co_return — inference rule
-- Built SimpleGenerator with correct next() guard and const value()
-- Implemented fibonacci() coroutine with range parameters
-- Investigated Option 3: fibonacci_state_at(int index) as a plain function
-- Fixed index-as-value bug in first fibonacci_state_at attempt
-- Wired up fibonacci_state_at + fibonacci coroutine cleanly in main()
+- The three keywords: `co_yield`, `co_await`, `co_return` — inference rule
+- Built `SimpleGenerator` with correct `next()` guard and `const value()`
+- Implemented `fibonacci()` coroutine with range parameters
+- Investigated Option 3: `fibonacci_state_at(int index)` as a plain function
+- Fixed index-as-value bug in first `fibonacci_state_at` attempt
+- Wired up `fibonacci_state_at` + `fibonacci` coroutine cleanly in `main()`
 
 **Key takeaways:**
-- A function becomes a coroutine by inference — no keyword, just co_yield/co_await/co_return in the body
+- A function becomes a coroutine by inference — no keyword, just `co_yield`/`co_await`/`co_return` in the body
 - Coroutine local state lives in a heap-allocated frame, survives every suspension
 - If a helper function never needs to suspend, it should be a plain function — not a coroutine
 - Coroutines should express flow, not policy — push starting-state decisions to the caller
 
 **Next session:** S02 — The three keywords in depth: co_await, co_yield, co_return
-Load project file and paste: "Starting S02 from the beginning."
+Load project file and paste: `"Starting S02 from the beginning."`
 
 ---
 
@@ -223,22 +223,22 @@ Load project file and paste: "Starting S02 from the beginning."
 **Status:** ✅ Complete
 
 **Completed:**
-- Explained the three keywords: co_yield (outbound pause), co_await (inbound pause), co_return (exit)
-- Covered the co_yield desugaring: co_yield expr → co_await promise.yield_value(expr)
+- Explained the three keywords: `co_yield` (outbound pause), `co_await` (inbound pause), `co_return` (exit)
+- Covered the `co_yield` desugaring: `co_yield` expr → `co_await` `promise.yield_value(expr)`
 - Covered the compiler transformation: suspended coroutine as a state machine with a heap-allocated frame
 - Task 1: instrumented yield_value with logging — pull model interleaving made visible
-- Task 2: switched from return_void to return_value(std::string); stored final message in promise via std::optional; exposed via summary() with assert(handle.done()) guard
-- Task 3: generalised SimpleGenerator into Generator<T>; implemented summarize() using all three keywords; confirmed co_await std::suspend_never{} is a runtime no-op
+- Task 2: switched from `return_void` to `return_value(std::string)`; stored final message in promise via `std::optional`; exposed via `summary()` with `assert(handle.done())` guard
+- Task 3: generalised `SimpleGenerator` into `Generator<T>`; implemented `summarize()` using all three keywords; confirmed `co_await` `std::suspend_never{}` is a runtime no-op
 
 **Key takeaways:**
-- co_yield desugars to co_await on the promise — yield behavior is fully user-defined
-- co_await suspend_never: await_ready() returns true, suspension is skipped entirely, no control transfer
-- std::optional used as "not yet set" sentinel has a design smell: callers cannot distinguish "not finished" from "no value"; assert on handle.done() is the right guard
-- Generator<T> hardcodes TReturn as std::string — a second template parameter TReturn would make it fully general
-- Dead code (SimpleGenerator) should be deleted once superseded
+- `co_yield` desugars to `co_await` on the promise — yield behavior is fully user-defined
+- `co_await` suspend_never: `await_ready()` returns true, suspension is skipped entirely, no control transfer
+- `std::optional` used as "not yet set" sentinel has a design smell: callers cannot distinguish "not finished" from "no value"; assert on `handle.done()` is the right guard
+- `Generator<T>` hardcodes TReturn as `std::string` — a second template parameter TReturn would make it fully general
+- Dead code (`SimpleGenerator`) should be deleted once superseded
 
 **Next session:** S03 — Stack frames vs. coroutine frames: where does the state live?
-Load project file and paste: "Starting S03 from the beginning."
+Load project file and paste: `"Starting S03 from the beginning."`
 
 ---
 
@@ -248,42 +248,43 @@ Load project file and paste: "Starting S03 from the beginning."
 **Status:** ✅ Complete
 
 **Completed:**
-- Explained the difference between stack frames and coroutine frames,
-  exploring how functions and coroutines handle context allocation
-  differently.
-- Contrasted the stack model and the heap model to see in practice where
-  functions and coroutines diverge in context management.
-- Explored the conceptual model the compiler generates when transforming
-  a coroutine into a heap-allocated state machine.
-- Task 1: Tracked frame allocation and deallocation timing by overriding
-  operator new/delete on the promise type. Confirmed the frame is
-  allocated at coroutine construction and freed only at handle.destroy(),
-  decoupled from any call stack lifetime.
-- Task 2: Verified in practice how frame size grows in relation to the
-  presence or absence of locals that survive a suspension point.
-- Task 3: Reproduced the dangling reference trap — passing a const ref to
-  a temporary that is destroyed before the coroutine resumes. Observed
-  silent UB (empty string output) in a Debug build.
+- Explained the difference between stack frames and coroutine frames, exploring how functions and coroutines handle context allocation differently.
+- Contrasted the stack model and the heap model to see in practice where functions and coroutines diverge in context management.
+- Explored the conceptual model the compiler generates when transforming a coroutine into a heap-allocated state machine.
+- Task 1: Tracked frame allocation and deallocation timing by overriding `operator new`/`operator delete` on the promise type. Confirmed the frame is allocated at coroutine construction and freed only at `handle.destroy()`, decoupled from any call stack lifetime.
+- Task 2: Verified in practice how frame size grows in relation to the presence or absence of locals that survive a suspension point.
+- Task 3: Reproduced the dangling reference trap — passing a const ref to a temporary that is destroyed before the coroutine resumes. Observed silent UB (empty string output) in a Debug build.
 
 **Key takeaways:**
-- The heap is the mechanism; handle.destroy() is the policy. The RAII
-  destructor enforces that policy. The call stack that created the
-  coroutine has no claim on when the frame dies.
-- Locals that cross a suspension point are promoted into the coroutine
-  frame and cost frame space. Locals that don't cross a suspension point
-  may remain on the stack (compiler-dependent; more likely in optimized
-  builds).
-- LIFO destruction order applies to the Generator handles in main() —
-  last constructed, first destroyed — because they are ordinary local
-  variables. This is standard C++, not a coroutine-specific rule.
-- Coroutine parameters need special attention when references are
-  involved. What is copied into the frame is the reference itself, not
-  the referent. If the referent's lifetime ends while the coroutine is
-  suspended, the reference dangles. Fix: take by value so the frame owns
-  the data.
+- The heap is the mechanism; `handle.destroy()` is the policy. The RAII destructor enforces that policy. The call stack that created the coroutine has no claim on when the frame dies.
+- Locals that cross a suspension point are promoted into the coroutine frame and cost frame space. Locals that don't cross a suspension point may remain on the stack (compiler-dependent; more likely in optimized builds).
+- LIFO destruction order applies to the `Generator` handles in `main()` — last constructed, first destroyed — because they are ordinary local variables. This is standard C++, not a coroutine-specific rule.
+- Coroutine parameters need special attention when references are involved. What is copied into the frame is the reference itself, not the referent. If the referent's lifetime ends while the coroutine is suspended, the reference dangles. Fix: take by value so the frame owns the data.
 
 **Next session:** S04 — Exercise: Trace the execution flow of a basic generator
-Load project file and paste: "Starting S04 from the beginning."
+Load project file and paste: `"Starting S04 from the beginning."`
+
+---
+
+### S04 — **Exercise:** Trace the execution flow of a basic generator
+**Date:** 2026-04-25
+**Curriculum:** 1.4
+**Status:** ✅ Complete
+
+**Completed:**
+- Instrumented `Generator<T>` at every meaningful lifecycle point: `operator new`/`operator delete`, `get_return_object`, `initial_suspend`, `yield_value`, `return_void`, `final_suspend`, `next()`, `value()`, and the `Generator` constructor/destructor.
+- Added a deferred `Logger` singleton that accumulates entries and dumps them in order at the end of `main()`, giving a clean chronological trace without interleaved `cout` noise.
+- Iterated on `main()` to add `value()` calls and coroutine-body log entries (`after first yield`, etc.), making the caller/coroutine ping-pong fully visible.
+- Answered all four debrief questions from the trace.
+
+**Key takeaways:**
+- Frame allocation and `get_return_object` are compiler-generated preamble that run before the `Generator` object lands in `main()`. The sequence is visible in the log (allocate → `get_return_object` → constructor) but there is no observable gap a caller can exploit.
+- `initial_suspend` is not part of the coroutine body. It is promise preamble. The body's first instruction only executes on the first explicit `resume()` call. This is the lazy model; `suspend_never` would be eager.
+- When `handle.resume()` is called, the thread enters the coroutine and runs until the next suspension point. `yield_value` fires inside that run, before control returns to `next()`. The caller is blocked for the entire duration.
+- The frame outlives the pump loop. `final_suspend` returning `suspend_always` keeps the coroutine suspended rather than self-destructing. The RAII destructor in `~Generator()` is the sole trigger for `handle.destroy()` and the subsequent frame deallocation.
+
+**Next session:** S05 — `std::coroutine_handle<>`: a pointer to a suspended coroutine.
+Load project file and paste: `"Starting S05 from the beginning."`
 
 ---
 

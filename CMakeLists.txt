@@ -53,5 +53,5 @@ endif()
 add_subdirectory(sessions/s01)
 add_subdirectory(sessions/s02)
 add_subdirectory(sessions/s03)
-#add_subdirectory(sessions/s04)
+add_subdirectory(sessions/s04)
 # add_subdirectory(sessions/s05)   # uncomment as sessions are added
