@@ -1,48 +1,5 @@
 #include <coroutine>
-#include <iostream>
-#include <sstream>   // for std::ostringstream in Logger::log
-#include <string>
-#include <vector>
-
-class Logger final {
-public:
-    static Logger& get_instance() {
-        static Logger _instance;
-        return _instance;
-    }
-
-    Logger() = default;
-    ~Logger() = default;
-
-    Logger& operator=(const Logger&) = delete;
-    Logger(const Logger&) = delete;
-
-    template<typename... Args>
-    void log(Args&&... args) {
-        std::ostringstream oss;
-        (oss << ... << std::forward<Args>(args));
-        logs.push_back(std::string(indent_level * 2, ' ') + oss.str());
-    }
-
-    void push_indent() { ++indent_level; }
-    void pop_indent()  { if (indent_level > 0) --indent_level; }
-
-    struct ScopeIndent {
-        ScopeIndent()  { Logger::get_instance().push_indent(); }
-        ~ScopeIndent() { Logger::get_instance().pop_indent(); }
-    };
-
-    void dump() const {
-        int counter = 0;
-        for (const auto& entry : logs) {
-            std::cout << "[" << ++counter << "] " << entry << "\n";
-        }
-    }
-
-private:
-    std::vector<std::string> logs;
-    int indent_level = 0;
-};
+#include "logger.h"
 
 template <typename T>
 struct Generator {
