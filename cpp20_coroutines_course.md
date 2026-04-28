@@ -128,7 +128,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
-| 2.1 | `std::coroutine_handle<>` — a pointer to a suspended coroutine | S05 | ⬜ Not started |
+| 2.1 | `std::coroutine_handle<>` — a pointer to a suspended coroutine | S05 | ✅ Completed |
 | 2.2 | The `promise_type` contract: what the compiler expects from you | S06 | ⬜ Not started |
 | 2.3 | Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception` | S07 | ⬜ Not started |
 | 2.4 | **Exercise:** Build `Generator<T>` from scratch — yields a sequence of integers | S08 | ⬜ Not started |
@@ -285,6 +285,36 @@ Load project file and paste: `"Starting S04 from the beginning."`
 
 **Next session:** S05 — `std::coroutine_handle<>`: a pointer to a suspended coroutine.
 Load project file and paste: `"Starting S05 from the beginning."`
+
+---
+
+### S05 — `std::coroutine_handle<>`: a pointer to a suspended coroutine
+**Date:** 2026-04-28
+**Curriculum:** 2.1
+**Status:** ✅ Complete
+
+**Completed:**
+
+- Explained `coroutine_handle<P>` as a non-owning typed pointer to a coroutine frame — no refcounting, no destructor logic, explicit ownership required.
+- Covered the type family: `coroutine_handle<P>` (typed, `.promise()` available) vs `coroutine_handle<void>` (type-erased, drive-only).
+- Covered the full operation set: `resume()`, `done()`, `destroy()`, `promise()`, `address()`, `from_promise()`, `from_address()`, and `operator bool`.
+- Explained the compiler frame layout: two function pointers (`__resume_fn`, `__destroy_fn`) plus the promise plus promoted locals — `coroutine_handle` is just a pointer to that struct.
+- Introduced `noop_coroutine()` — filed for S10–S11 (symmetric transfer).
+- Q1: Confirmed handle address is stable across `resume()` calls — the frame is a pinned heap allocation.
+- Q2: Confirmed promise is accessible after `done()` but before `destroy()`. Demonstrated post-destroy read returns MSVC debug fill pattern (`0xDDDDDDDD`) — UB in production. Fixed by nulling the handle after `destroy()`.
+- Q3: Constructed `coroutine_handle<void>` via implicit conversion. Confirmed address equality. Used typed handle for value access, erased handle for driving — demonstrated the capability split at the type level.
+- Part 2: Full `address()` → `void*` → `from_address()` → typed handle round-trip. Drove the generator entirely from the reconstructed handle. Flagged dual-handle ownership risk — two handles to one frame, one must be the sole destroyer.
+
+**Key takeaways:**
+
+- `coroutine_handle` is a `void*` with typed operations — same size, same cost, no hidden machinery.
+- Type erasure to `coroutine_handle<void>` removes `.promise()` at compile time. The frame is unchanged; you've only discarded the type needed to interpret it.
+- `from_address()` reconstructs a fully capable typed handle from a raw pointer — the async callback pattern in miniature.
+- Ownership is not enforced by the type. Two handles to the same frame is valid but dangerous. Designate one owner; treat all others as borrowed.
+- Safe preconditions: `resume()` requires suspended and not done; `destroy()` requires suspended (including at `final_suspend`). Violating either is UB.
+
+**Next session:** S06 — The promise_type contract: what the compiler expects from you.
+Load project file and paste: `"Starting S06 from the beginning."`
 
 ---
 
