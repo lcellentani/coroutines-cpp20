@@ -129,7 +129,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
 | 2.1 | `std::coroutine_handle<>` — a pointer to a suspended coroutine | S05 | ✅ Completed |
-| 2.2 | The `promise_type` contract: what the compiler expects from you | S06 | ⬜ Not started |
+| 2.2 | The `promise_type` contract: what the compiler expects from you | S06 | ✅ Completed |
 | 2.3 | Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception` | S07 | ⬜ Not started |
 | 2.4 | **Exercise:** Build `Generator<T>` from scratch — yields a sequence of integers | S08 | ⬜ Not started |
 
@@ -315,6 +315,37 @@ Load project file and paste: `"Starting S05 from the beginning."`
 
 **Next session:** S06 — The promise_type contract: what the compiler expects from you.
 Load project file and paste: `"Starting S06 from the beginning."`
+
+---
+
+### S06 — The `promise_type` contract: what the compiler expects from you
+**Date:** 2026-04-29
+**Curriculum:** 2.2
+**Status:** ✅ Complete
+
+**Completed:**
+
+- Explored the `promise_type` concept and its role in the coroutine model: the interface between the caller-facing wrapper type and the compiler-generated state machine.
+- Examined the compiler-generated coroutine transform in detail to understand at which point each `promise_type` method is invoked.
+- Covered the full `promise_type` interface: `get_return_object()`, `initial_suspend()`, `final_suspend()`, `return_void()`/`return_value()`, `unhandled_exception()`, `yield_value()`, and the optional extensions (`operator new`/`delete`, `await_transform`).
+- Task 1: Removed each required method one at a time and documented the compiler errors. Observed that `initial_suspend`, `final_suspend`, and `get_return_object` are validated at the function signature — before the body runs — while `return_void` is flagged at the `co_return` call site. `unhandled_exception` produces a distinct "required to declare" diagnostic because it is structural rather than a direct call-site lookup.
+- Task 2: Swapped `final_suspend` between `suspend_always` and `suspend_never` to observe the ownership and lifetime implications. Confirmed that `suspend_never` causes the frame to be deleted synchronously inside the coroutine before it returns to the caller, leaving the wrapper holding a dangling handle. Demonstrated the resulting UB via segfault and log trace. Attempted AddressSanitizer but hit a Windows CRT mismatch issue (`_ITERATOR_DEBUG_LEVEL`); segfault and log trace were sufficient evidence.
+- Task 3: Implemented `unhandled_exception` to store the exception via `std::current_exception()`, and exposed a `get()` method on the wrapper type to rethrow it at the call site. Verified the full exception round-trip: throw inside coroutine → captured in promise → rethrown in `main` → caught and logged correctly.
+- Discovered that removing `co_return` from a coroutine body that contains no other coroutine keywords silently demotes the function to a regular function. The exception then propagates directly up the call stack instead of being routed through `unhandled_exception`.
+
+**Key takeaways:**
+
+- `promise_type` is the interface between two distinct consumers: the caller (via the wrapper type) and the compiler (via the generated state machine). Neither talks directly to the other — the promise mediates.
+- `suspend_never` at `final_suspend` transfers frame ownership back to the coroutine itself, which deletes it immediately. Any handle held by the caller 
+  after this point is dangling. `suspend_always` keeps the frame alive and makes the RAII destructor the sole cleanup point — the correct pattern for handle-based coroutine types.
+- The `if (handle)` guard in a destructor does not protect against use-after-free. `operator bool` on a `coroutine_handle` checks for a non-null pointer, not for a live frame.
+- Exception propagation across coroutine boundaries does not follow the normal stack-unwinding model. The compiler wraps the coroutine body in a try/catch; `unhandled_exception` is the catch handler. Storing via `std::exception_ptr` and rethrowing at the call site is the standard pattern.
+- A function body must contain at least one coroutine keyword (`co_await`, `co_yield`, `co_return`) to be treated as a coroutine by the compiler. Without one, the function is a normal function — no promise, no frame, no `unhandled_exception` routing. An unreachable `co_return` at the end of a throwing coroutine is the standard idiom to preserve coroutine status.
+- In game development, exceptions are typically disabled (`-fno-exceptions`) due to binary size overhead, unpredictable latency, and real-time constraints. In production coroutine code, `std::exception_ptr` would likely be replaced by an error code or `std::variant<T, Error>`.
+
+**Next session:** S07 — Lifecycle methods: `get_return_object`, 
+`initial_suspend`, `final_suspend`, `unhandled_exception`.
+Load project file and paste: `"Starting S07 from the beginning."`
 
 ---
 
