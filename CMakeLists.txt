@@ -60,5 +60,6 @@ add_subdirectory(sessions/s03)
 add_subdirectory(sessions/s04)
 add_subdirectory(sessions/s05)
 add_subdirectory(sessions/s06)
+add_subdirectory(sessions/s07)
 
 

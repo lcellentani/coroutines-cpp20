@@ -130,7 +130,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 |---|-------|---------|--------|
 | 2.1 | `std::coroutine_handle<>` — a pointer to a suspended coroutine | S05 | ✅ Completed |
 | 2.2 | The `promise_type` contract: what the compiler expects from you | S06 | ✅ Completed |
-| 2.3 | Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception` | S07 | ⬜ Not started |
+| 2.3 | Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception` | S07 | ✅ Completed |
 | 2.4 | **Exercise:** Build `Generator<T>` from scratch — yields a sequence of integers | S08 | ⬜ Not started |
 
 ---
@@ -357,6 +357,32 @@ Load project file and paste: `"Starting S07 from the beginning."`
 | 🔄 | In progress |
 | ✅ | Complete |
 | ⚠️ | Needs revisit |
+
+---
+
+### S07 — Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception`
+**Date:** 2026-05-01
+**Curriculum:** 2.3
+**Status:** ✅ Complete
+
+**Completed:**
+
+- Deep-dived all four lifecycle methods: timing, design space, and consequences of each choice.
+- Ran all four combinations of `initial_suspend` / `final_suspend`, confirmed execution order empirically with an instrumented logger.
+- Task 2: Isolated the eager vs. lazy distinction — confirmed "First line of coroutine body" flips relative to "Back in main" depending solely on `initial_suspend` return value.
+- Task 3: Observed `handle.done()` returning `false` on a freed frame. Confirmed this is silent UB — the allocator hadn't overwritten the memory yet, producing a plausible but meaningless result.
+- Task 4: Implemented all three `unhandled_exception` strategies. Strategy 1 (store + rethrow): clean lifecycle, `final_suspend` reached, RAII destructor fires safely. Strategy 2 (`std::terminate()`): confirmed it cannot be caught — hard process abort, not an exception. Strategy 3 (`throw;`): exception surfaces at `resume()` call site but `final_suspend` is never reached; frame is in indeterminate state; handle must be nulled in the catch block before destructor fires.
+
+**Key takeaways:**
+
+- `get_return_object` runs before the body. The wrapper must be constructable in a not-yet-started state.
+- `initial_suspend` and `final_suspend` are coupled decisions. Safe default for handle-owning wrappers: `suspend_always` / `suspend_always`.
+- `handle.done()` on a freed frame returns garbage without crashing — the silent wrong-answer form of UB.
+- `throw;` in `unhandled_exception` skips `final_suspend`. Any cleanup or signalling that `final_suspend` would have done is silently lost.
+- `std::terminate()` bypasses the entire exception mechanism. It is the correct choice when exceptions are disabled or when the condition represents a hard contract violation.
+
+**Next session:** S08 — Build `Generator<T>` from scratch — yields a sequence of integers.
+Load project file and paste: `"Starting S08 from the beginning."`
 
 ---
 
