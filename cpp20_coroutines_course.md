@@ -131,7 +131,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 2.1 | `std::coroutine_handle<>` — a pointer to a suspended coroutine | S05 | ✅ Completed |
 | 2.2 | The `promise_type` contract: what the compiler expects from you | S06 | ✅ Completed |
 | 2.3 | Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception` | S07 | ✅ Completed |
-| 2.4 | **Exercise:** Build `Generator<T>` from scratch — yields a sequence of integers | S08 | ⬜ Not started |
+| 2.4 | **Exercise:** Build `Generator<T>` from scratch — yields a sequence of integers | S08 | ✅ Completed |
 
 ---
 
@@ -383,6 +383,28 @@ Load project file and paste: `"Starting S07 from the beginning."`
 
 **Next session:** S08 — Build `Generator<T>` from scratch — yields a sequence of integers.
 Load project file and paste: `"Starting S08 from the beginning."`
+
+---
+
+### S08 — Exercise: Build `Generator<T>` from scratch
+**Date:** 2026-05-02
+**Curriculum:** 2.4
+**Status:** ✅ Complete
+
+**Completed:**
+- Implemented `Generator<T>` from scratch with no scaffolding: full `promise_type`, move-only wrapper, lazy initial suspend, `suspend_always` at final suspend, RAII frame ownership.
+- Implemented `range(int from, int to)` — half-open `[from, to)` range — and `fibonacci(int n)` — first n Fibonacci numbers.
+- Applied two post-review fixes: `value()` changed from `T` to `const T&`; `next()` wrapped in `try/catch(...)` to null the handle before rethrowing on exception, preventing double-free when `throw;` in `unhandled_exception` skips `final_suspend`.
+- Verified range boundary with `range(1, 6)` → confirmed half-open semantics were correct by design, not coincidence.
+
+**Key takeaways:**
+- `throw;` in `unhandled_exception` frees the frame before the exception reaches the caller. The destructor's `if (handle)` guard gives false safety — it checks for null, not liveness. The fix is to null the handle proactively in the catch block inside `next()`.
+- `catch (const std::exception&)` is wrong for cleanup handlers. Use `catch (...)` when the goal is intercept-cleanup-rethrow, not inspection.
+- The double-free bug only manifests on the exception path — the normal path looks correct. Bugs that require two simultaneous code paths to reason about are the ones that survive code review.
+- `const T&` is the right return type for `value()` — avoids a copy on every call; the referent is stable until the next `next()` invocation.
+
+**Next session:** S09 — The Awaitable concept: `await_ready`, `await_suspend`, `await_resume`.
+Load project file and paste: `"Starting S09 from the beginning."`
 
 ---
 
