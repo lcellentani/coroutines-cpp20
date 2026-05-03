@@ -140,7 +140,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
-| 3.1 | The `Awaitable` concept: `await_ready`, `await_suspend`, `await_resume` | S09 | ⬜ Not started |
+| 3.1 | The `Awaitable` concept: `await_ready`, `await_suspend`, `await_resume` | S09 | ✅ Completed |
 | 3.2 | `await_suspend` return types — void, bool, and handle (symmetric transfer) | S10 | ⬜ Not started |
 | 3.3 | Symmetric transfer and tail-call optimization — avoiding stack overflow | S11 | ⬜ Not started |
 | 3.4 | Thread switching via `await_suspend` | S12 | ⬜ Not started |
@@ -349,17 +349,6 @@ Load project file and paste: `"Starting S07 from the beginning."`
 
 ---
 
-## 🔧 Reference: Status Legend
-
-| Symbol | Meaning |
-|--------|---------|
-| ⬜ | Not started |
-| 🔄 | In progress |
-| ✅ | Complete |
-| ⚠️ | Needs revisit |
-
----
-
 ### S07 — Lifecycle methods: `get_return_object`, `initial_suspend`, `final_suspend`, `unhandled_exception`
 **Date:** 2026-05-01
 **Curriculum:** 2.3
@@ -405,6 +394,38 @@ Load project file and paste: `"Starting S08 from the beginning."`
 
 **Next session:** S09 — The Awaitable concept: `await_ready`, `await_suspend`, `await_resume`.
 Load project file and paste: `"Starting S09 from the beginning."`
+
+---
+
+### S09 — The Awaitable Pattern: `await_ready`, `await_suspend`, `await_resume`
+**Date:** 2026-05-03
+**Curriculum:** 3.1
+**Status:** ✅ Complete
+
+**Completed:**
+- Covered the three awaitable methods: `await_ready`, `await_suspend`, `await_resume` — their call order, return type variants for `await_suspend` (`void`, `bool`, `coroutine_handle<>`), and the role of each.
+- Task 1: Implemented `ReadyAwaitable` — `await_ready` returns `true`, suspension skipped entirely, `await_resume` fires inline. Confirmed via log trace that `await_suspend` never appears in output. Also refactored the coroutine wrapper from `Generator<T>` to a proper `Task` type unprompted.
+- Task 2: Implemented `DeferredAwaitable` — `await_ready` returns `false`, `await_suspend` calls `handle.resume()` synchronously, producing a round-trip on the same call stack. Confirmed via log trace: `await_resume` fires nested inside `await_suspend` before it returns.
+
+**Key takeaways:**
+- `await_ready = true` bypasses suspension entirely. `await_resume` is still called — it is always the final step of a `co_await` expression, suspension or not. It is the only method that can produce a value from an awaitable.
+- `await_suspend` with a `void` return and an internal `handle.resume()` call produces a synchronous round-trip. The coroutine resumes and runs to its next suspension point before `await_suspend` returns. This nests frames on the caller's stack — the problem symmetric transfer solves.
+- Symmetric transfer (`await_suspend` returning `coroutine_handle<>`) makes the resume a tail call, keeping stack depth constant regardless of chain length. Critical for job systems with deep coroutine dependencies.
+- `await_resume`'s return type is the type of the entire `co_await` expression. The caller captures it as a normal value.
+
+**Next session:** S10 — `operator co_await` and the Awaiter vs. Awaitable distinction.
+Load project file and paste: `"Starting S10 from the beginning."`
+
+---
+
+## 🔧 Reference: Status Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| ⬜ | Not started |
+| 🔄 | In progress |
+| ✅ | Complete |
+| ⚠️ | Needs revisit |
 
 ---
 

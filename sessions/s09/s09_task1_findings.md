@@ -1,0 +1,105 @@
+Here is the code for Task 1:
+
+```cpp
+#include <coroutine>
+#include "logger.h"
+
+struct ReadyAwaitable {
+    bool await_ready() const {
+        Logger::get_instance().log("[ReadyAwaitable] await_ready: (true)");
+        return true;
+    }
+
+    void await_suspend(std::coroutine_handle<>) const noexcept {
+        Logger::get_instance().log("[ReadyAwaitable] await_suspend: (not suspending)");
+    }
+
+    int await_resume() const {
+        Logger::get_instance().log("[ReadyAwaitable] await_resume: (42)");
+        return 42;
+    }
+};
+
+struct Task {
+    struct promise_type {
+        auto get_return_object() {
+            return Task{ std::coroutine_handle<promise_type>::from_promise(*this) };
+        }
+
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
+
+        void return_void() {}
+
+        void unhandled_exception() {}
+    };
+
+    using Handle = std::coroutine_handle<promise_type>;
+    Handle handle {};
+
+    Task(Handle h) : handle(h) {}
+    ~Task() {
+        if (handle) {
+            handle.destroy();
+            handle = nullptr;
+        }
+    }
+
+    Task(const Task&) = delete;
+    Task& operator=(const Task&) = delete;
+
+    Task(Task&& other) noexcept : handle(other.handle) {
+        other.handle = nullptr;
+    }
+    Task& operator=(Task&& other) noexcept {
+        if (this != &other) {
+            if (handle) {
+                handle.destroy();
+            }
+            handle = other.handle;
+            other.handle = nullptr;
+        }
+        return *this;
+    }
+
+    bool next() {
+        if (!handle || handle.done()) {
+            return false;
+        }
+
+        handle.resume();
+
+        return !handle.done();
+    }
+};
+
+Task custom_awaitable() {
+    int result = co_await ReadyAwaitable{};
+    Logger::get_instance().log("Result from custom awaitable: " + std::to_string(result));
+}
+
+int main() {
+    auto& log = Logger::get_instance();
+    log.log("Entering main...");
+
+    {
+        auto awaitable_gen = custom_awaitable();
+        while (awaitable_gen.next()) {
+            // No values to process, just waiting for completion
+        }
+    }
+    
+    log.log("Exiting main...");
+
+    log.dump();
+
+    return 0;
+}
+```
+
+The output of this code will be:
+```
+[1] Entering main...
+[2] Result from custom awaitable: 42
+[3] Exiting main...
+```
