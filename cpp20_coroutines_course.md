@@ -141,7 +141,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
 | 3.1 | The `Awaitable` concept: `await_ready`, `await_suspend`, `await_resume` | S09 | ✅ Completed |
-| 3.2 | `await_suspend` return types — void, bool, and handle (symmetric transfer) | S10 | ⬜ Not started |
+| 3.2 | `await_suspend` return types — void, bool, and handle (symmetric transfer) | S10 | ✅ Completed |
 | 3.3 | Symmetric transfer and tail-call optimization — avoiding stack overflow | S11 | ⬜ Not started |
 | 3.4 | Thread switching via `await_suspend` | S12 | ⬜ Not started |
 | 3.5 | **Exercise:** Build a `Sleep` awaitable — suspend and resume after a timer | S13 | ⬜ Not started |
@@ -415,6 +415,28 @@ Load project file and paste: `"Starting S09 from the beginning."`
 
 **Next session:** S10 — `operator co_await` and the Awaiter vs. Awaitable distinction.
 Load project file and paste: `"Starting S10 from the beginning."`
+
+---
+
+### S10 — `operator co_await` and the Awaiter vs. Awaitable distinction
+**Date:** 2026-05-05
+**Curriculum:** 3.2
+**Status:** ✅ Complete
+
+**Completed:**
+- Covered the Awaiter vs. Awaitable distinction: an awaiter implements the three methods directly; an awaitable is any object from which an awaiter can be obtained via `operator co_await` (member or free function) or `await_transform` on the promise.
+- Covered the compiler's `co_await` lookup chain: `await_transform` → free `operator co_await` → member `operator co_await` → expr is the awaiter directly.
+- Task 1: Implemented `TimedResult` with a member `operator co_await()` returning a `ValueAwaiter`. Confirmed `await_suspend` is never called when `await_ready = true` — absent from trace. Learned that Clang requires all three awaiter methods at compile time regardless of runtime reachability; empty `await_suspend` with a comment is the correct pattern.
+- Task 2: Implemented `Delay` as pure data with no methods. Wrote a free function `operator co_await(Delay)` returning an `Awaiter` that suspends and resumes synchronously. Confirmed via log trace: `await_suspend` fires, calls `h.resume()` synchronously, `await_resume` fires nested inside it before `await_suspend` returns, coroutine body completes, then `await_suspend` unwinds.
+
+**Key takeaways:**
+- The awaiter interface is structural and fully validated at compile time. All three methods are required even when `await_ready = true` makes `await_suspend` dead code. Clang enforces this strictly.
+- `operator co_await` as a free function lets you make any type awaitable without modifying it. The type is pure data; the suspension mechanics live entirely outside it.
+- The synchronous round-trip pattern (`await_ready = false` + `h.resume()` inside `await_suspend`) nests the coroutine's continuation inside the `await_suspend` call frame. The log sequence makes this visible: suspend → resume → resume-body → unwind.
+- `await_transform` on the promise is the intercept point for executor frameworks — every `co_await` in a coroutine goes through it. Deferred to Phase 4.
+
+**Next session:** S11 —  Symmetric transfer and tail-call optimization — avoiding stack overflow.
+Load project file and paste: `"Starting S11 from the beginning."`
 
 ---
 
