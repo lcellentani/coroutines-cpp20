@@ -142,7 +142,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 |---|-------|---------|--------|
 | 3.1 | The `Awaitable` concept: `await_ready`, `await_suspend`, `await_resume` | S09 | ✅ Completed |
 | 3.2 | `await_suspend` return types — void, bool, and handle (symmetric transfer) | S10 | ✅ Completed |
-| 3.3 | Symmetric transfer and tail-call optimization — avoiding stack overflow | S11 | ⬜ Not started |
+| 3.3 | Symmetric transfer and tail-call optimization — avoiding stack overflow | S11 | ✅ Completed |
 | 3.4 | Thread switching via `await_suspend` | S12 | ⬜ Not started |
 | 3.5 | **Exercise:** Build a `Sleep` awaitable — suspend and resume after a timer | S13 | ⬜ Not started |
 
@@ -439,6 +439,27 @@ Load project file and paste: `"Starting S10 from the beginning."`
 Load project file and paste: `"Starting S11 from the beginning."`
 
 ---
+
+### S11 — Symmetric Transfer and Tail-Call Optimization
+**Date:** 2026-05-09
+**Curriculum:** 3.3
+**Status:** ✅ Complete
+
+Completed:
+- Explained the stack overflow problem with void `await_suspend` + `handle.resume()`: stack depth is O(N) proportional to chain length.
+- Part 1: Confirmed empirically — naive chain of 10k coroutines crashes between depth 2000–3000 on Windows default stack. Used `std::cout` + flush to pinpoint the crash depth since the buffered logger never gets to `dump()`.
+- Part 2: Rewrote `NaiveAwaitable` → `SymmetricAwaitable` returning `coroutine_handle<>` from `await_suspend`. Same 10k chain completes cleanly. Log confirms `await_suspend` returns before the next depth executes — O(1) stack depth throughout.
+- Identified latent double-free UB: `suspend_never` causes frame self-destruction, but Task destructor also calls `handle.destroy()`. Fix: null the handle before `co_await` to release ownership.
+- Introduced `noop_coroutine()` as the safe sentinel when there is no continuation to transfer to.
+
+Key takeaways:
+- void `await_suspend` calling `handle.resume()` nests frames — stack grows with chain length.
+- Returning `coroutine_handle<>` from `await_suspend` makes resume a tail call — current frame unwinds before target starts. Stack depth stays constant.
+- `suspend_never` + owning handle = double-free. Always release ownership before symmetric transfer if the frame will self-destruct.
+- `noop_coroutine()` is the null sentinel for symmetric transfer — safe to "resume" (does nothing), prevents UB from returning `nullptr`.
+
+**Next session:** S12 — Thread switching via await_suspend.
+Load project file and paste: `"Starting S12 from the beginning."`
 
 ## 🔧 Reference: Status Legend
 
