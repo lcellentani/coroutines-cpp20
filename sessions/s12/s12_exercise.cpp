@@ -1,5 +1,6 @@
 #include <coroutine>
 #include <iostream>
+#include <functional>
 #include <latch>
 #include <mutex>
 #include <queue>
@@ -70,7 +71,7 @@ struct ScheduleOn {
 
 struct Task {
     struct promise_type {
-        std::latch* completion = nullptr;
+        std::function<void()> on_complete;
 
         auto get_return_object() {
             return Task{ std::coroutine_handle<promise_type>::from_promise(*this) };
@@ -81,8 +82,8 @@ struct Task {
             struct FinalAwaiter {
                 bool await_ready() const noexcept { return false; }
                 void await_suspend(std::coroutine_handle<promise_type> h) noexcept {
-                    if (h.promise().completion) {
-                        h.promise().completion->count_down();
+                    if (h.promise().on_complete) {
+                        h.promise().on_complete();
                     }
                 }
                 void await_resume() const noexcept {}
@@ -105,6 +106,20 @@ struct Task {
     // Non-copyable
     Task(const Task&) = delete;
     Task& operator=(const Task&) = delete;
+
+    Task(Task&& other) noexcept : handle(other.handle) {
+        other.handle = nullptr;
+    }
+    Task& operator=(Task&& other) noexcept {
+        if (this != &other) {
+            if (handle) {
+                handle.destroy();
+            }
+            handle = other.handle;
+            other.handle = nullptr;
+        }
+        return *this;
+    }
 };
 
 ThreadPool pool(4);
@@ -122,21 +137,14 @@ int main() {
 
     std::latch done(4);
 
-    Task t1 = work();
-    t1.handle.promise().completion = &done;
-    t1.handle.resume();
+    std::vector<Task> tasks;
+    tasks.reserve(4);
 
-    Task t2 = work();
-    t2.handle.promise().completion = &done;
-    t2.handle.resume();
-
-    Task t3 = work();
-    t3.handle.promise().completion = &done;
-    t3.handle.resume();
-
-    Task t4 = work();
-    t4.handle.promise().completion = &done;
-    t4.handle.resume();
+    for(int i = 0; i < 4; i++) {
+        Task& task = tasks.emplace_back(work());
+        task.handle.promise().on_complete = [&done] { done.count_down(); };
+        task.handle.resume();
+    }
 
     done.wait();
 
