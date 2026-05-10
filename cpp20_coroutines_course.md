@@ -143,7 +143,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 3.1 | The `Awaitable` concept: `await_ready`, `await_suspend`, `await_resume` | S09 | ✅ Completed |
 | 3.2 | `await_suspend` return types — void, bool, and handle (symmetric transfer) | S10 | ✅ Completed |
 | 3.3 | Symmetric transfer and tail-call optimization — avoiding stack overflow | S11 | ✅ Completed |
-| 3.4 | Thread switching via `await_suspend` | S12 | ⬜ Not started |
+| 3.4 | Thread switching via `await_suspend` | S12 | ✅ Completed |
 | 3.5 | **Exercise:** Build a `Sleep` awaitable — suspend and resume after a timer | S13 | ⬜ Not started |
 
 ---
@@ -445,21 +445,47 @@ Load project file and paste: `"Starting S11 from the beginning."`
 **Curriculum:** 3.3
 **Status:** ✅ Complete
 
-Completed:
+**Completed:**
 - Explained the stack overflow problem with void `await_suspend` + `handle.resume()`: stack depth is O(N) proportional to chain length.
 - Part 1: Confirmed empirically — naive chain of 10k coroutines crashes between depth 2000–3000 on Windows default stack. Used `std::cout` + flush to pinpoint the crash depth since the buffered logger never gets to `dump()`.
 - Part 2: Rewrote `NaiveAwaitable` → `SymmetricAwaitable` returning `coroutine_handle<>` from `await_suspend`. Same 10k chain completes cleanly. Log confirms `await_suspend` returns before the next depth executes — O(1) stack depth throughout.
 - Identified latent double-free UB: `suspend_never` causes frame self-destruction, but Task destructor also calls `handle.destroy()`. Fix: null the handle before `co_await` to release ownership.
 - Introduced `noop_coroutine()` as the safe sentinel when there is no continuation to transfer to.
 
-Key takeaways:
+**Key takeaways:**
 - void `await_suspend` calling `handle.resume()` nests frames — stack grows with chain length.
 - Returning `coroutine_handle<>` from `await_suspend` makes resume a tail call — current frame unwinds before target starts. Stack depth stays constant.
 - `suspend_never` + owning handle = double-free. Always release ownership before symmetric transfer if the frame will self-destruct.
 - `noop_coroutine()` is the null sentinel for symmetric transfer — safe to "resume" (does nothing), prevents UB from returning `nullptr`.
 
-**Next session:** S12 — Thread switching via await_suspend.
+**Next session:** S12 — Thread switching via `await_suspend`.
 Load project file and paste: `"Starting S12 from the beginning."`
+
+---
+
+### S12 — Thread Switching via await_suspend
+**Date:** 2026-05-10
+**Curriculum:** 3.4
+**Status:** ✅ Complete
+
+**Completed:**
+- Explained the thread-switching pattern: `await_suspend` receives the handle and dispatches it to a thread pool instead of calling `resume()` directly. The current thread walks away; whoever calls `resume()` on the handle runs the continuation.
+- Built a `ThreadPool` (4 workers) storing `coroutine_handle<>` in a queue and calling `resume()` on worker threads.
+- Built `ScheduleOn` awaitable: `await_ready = false` always, `await_suspend` dispatches the handle to the pool and returns void.
+- Fixed the `Task` destructor segfault: root cause was `main()` exiting while the coroutine frame was still live on a pool thread. Fix: custom `FinalAwaiter` in `final_suspend` that signals a `std::latch` before the frame goes quiet; main blocks on `done.wait()` before `Task` destructors fire.
+- Scaled to 4 concurrent tasks with `std::latch(4)`. Output confirmed each task resumes on a different worker thread.
+
+**Key takeaways:**
+- The thread-switch pattern inverts the S09/S10 pattern: `await_suspend` passes the handle out instead of calling `resume()` on it. No nested frames, no synchronous round-trip.
+- `final_suspend` as a custom `FinalAwaiter` (not `suspend_always`) is the correct hook for signaling completion — it fires after the coroutine body ends but before the frame is destroyed.
+- `std::latch` is the right primitive for "wait for N coroutines to complete."
+- `Task` destructor calling `handle.destroy()` is safe only if the owner outlives execution. Move semantics (nulling the source handle) is the fix for transferable ownership — not yet implemented.
+- `std::cout` across threads without a mutex is a data race; interleaved output is the visible symptom.
+
+**Next session: S13** — Build a Sleep awaitable: suspend and resume after a timer.
+Load project file and paste: `"Starting S13 from the beginning."`
+
+---
 
 ## 🔧 Reference: Status Legend
 
