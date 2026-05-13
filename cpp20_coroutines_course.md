@@ -144,7 +144,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 3.2 | `await_suspend` return types — void, bool, and handle (symmetric transfer) | S10 | ✅ Completed |
 | 3.3 | Symmetric transfer and tail-call optimization — avoiding stack overflow | S11 | ✅ Completed |
 | 3.4 | Thread switching via `await_suspend` | S12 | ✅ Completed |
-| 3.5 | **Exercise:** Build a `Sleep` awaitable — suspend and resume after a timer | S13 | ⬜ Not started |
+| 3.5 | **Exercise:** Build a `Sleep` awaitable — suspend and resume after a timer | S13 | ✅ Completed |
 
 ---
 
@@ -486,6 +486,31 @@ Load project file and paste: `"Starting S12 from the beginning."`
 Load project file and paste: `"Starting S13 from the beginning."`
 
 ---
+
+### S13 — Build a `Sleep` Awaitable
+**Date:** 2026-05-10
+**Curriculum:** 3.4
+**Status:** ✅ Complete
+
+**Completed:**
+- Built a `Sleep` awaitable (Option A): `await_suspend` detaches a `std::thread` that sleeps for the duration then calls `handle.resume()`. Duration and handle captured by value — correct lifetime.
+- v1 used promise constructor injection to pass the `std::latch*` directly from the coroutine parameter list into `promise_type`. Works, but couples the promise to the coroutine's signature.
+- v2 switched to `on_complete` callback (S12 pattern) + `suspend_never` in `initial_suspend`. Cleaner decoupling; no manual `resume()` in main.
+- Identified the latent race in `suspend_never` + post-construction callback wiring: if the coroutine completes synchronously before `on_complete` is set, the latch never counts down and main hangs. Not live here due to `Sleep` always suspending, but the pattern is fragile. Fix: `suspend_always` + set callback + manual `resume()` guarantees a setup window.
+- Discussed Option B (single `TimerQueue` background thread): `await_suspend` registers `{wake_time, handle}` into the queue; background thread uses `wait_until` on a condition variable, wakes on the earliest entry, fires expired handles. Notify required when a new entry is earlier than the current head. Callback layer is optional — exists only to decouple the queue from `coroutine_handle`. Full implementation deferred to Phase 4.
+
+**Key takeaways:**
+- `await_suspend` detaching a thread is the minimal correct implementation of time-based resumption. Handle and duration must be captured by value — the `Sleep` temporary is gone by the time the thread wakes.
+- `suspend_never` is eager: the coroutine starts executing before the caller finishes setup. Safe only when all suspension points are guaranteed to be asynchronous. `suspend_always` is the defensive choice when setup must precede execution.
+- Promise constructor injection from coroutine parameters is a real C++ feature, not a hack — but it tightly couples `promise_type` to the coroutine signature. The `on_complete` callback is more flexible.
+- Option A (one thread per sleep) vs Option B (shared `TimerQueue`) is a resource trade-off: O(N) threads vs O(1) thread with a priority queue. Real schedulers (Asio, libuv) are Option B.
+
+**Next session: S14** —  Integrating with event loops — Asio patterns.
+Load project file and paste: `"Starting S14 from the beginning."`
+
+---
+
+
 
 ## 🔧 Reference: Status Legend
 
