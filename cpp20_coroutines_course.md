@@ -153,7 +153,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
-| 4.1 | Integrating with event loops — libuv and Asio patterns | S14 | ⬜ Not started |
+| 4.1 | Integrating with event loops — libuv and Asio patterns | S14 | ✅ Completed |
 | 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ⬜ Not started |
 | 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ⬜ Not started |
 | 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ⬜ Not started |
@@ -488,8 +488,8 @@ Load project file and paste: `"Starting S13 from the beginning."`
 ---
 
 ### S13 — Build a `Sleep` Awaitable
-**Date:** 2026-05-10
-**Curriculum:** 3.4
+**Date:** 2026-05-13
+**Curriculum:** 3.5
 **Status:** ✅ Complete
 
 **Completed:**
@@ -510,7 +510,29 @@ Load project file and paste: `"Starting S14 from the beginning."`
 
 ---
 
+### S14 —  Integrating with Event Loops: Asio Patterns
+**Date:** 2026-05-13
+**Curriculum:** 4.1
+**Status:** ✅ Complete
 
+**Completed:**
+- Set up standalone Asio 1.36.0 as a header-only dependency inside the project (`libs/asio-1.36.0/`).
+- Fixed CMake `asio` INTERFACE target: added `_WIN32_WINNT=0x0601` and `-Wno-language-extension-token` (Clang + MSVC `__try` extension) to eliminate all warnings. Fixed ordering bug — `target_compile_options` must follow add_library.
+- Added `NEEDS_ASIO` flag to S14's `CMakeLists.txt` to link the `asio` target.
+- Built a two-coroutine program: `worker(name, delay)` uses `co_await asio::this_coro::executor` to retrieve the executor, creates a `steady_timer`, and `co_awaits` it via `asio::use_awaitable`. Both workers launched concurrently via `co_spawn` with `asio::detached`. `io.run()` serves as the natural join point — no `std::latch`, no manual `resume()`.
+- Output confirmed correct concurrency: A and B both start before either resumes; B (100ms) wakes before A (200ms) regardless of launch order.
+
+**Key takeaways:**
+- `co_await asio::this_coro::executor` is the idiomatic way to get the executor inside an Asio coroutine — no need to pass `io_context` as a parameter.
+- `asio::use_awaitable` is a completion token that converts Asio's callback-based async ops into awaitables. It does exactly what `Sleep::await_suspend` did in S13 — captures the handle, wires it to a callback — but as production infrastructure.
+- `io.run()` blocks until all posted work is done. It replaces all manual lifetime management from Phases 2–3.
+- A single `io_context` thread can drive multiple concurrent coroutines. Concurrency here is interleaving at suspension points, not parallelism.
+- `asio::awaitable<T>` uses `await_transform` internally to bind every `co_await` to the executor — the mechanism that ensures all resumptions happen on the `io_context` thread. Full details deferred to the capstone.
+
+**Next session: S15** —  HALO: Heap Allocation Elision Optimization — what it is and when it fails.
+Load project file and paste: `"Starting S15 from the beginning."`
+
+---
 
 ## 🔧 Reference: Status Legend
 

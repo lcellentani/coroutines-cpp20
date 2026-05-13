@@ -41,9 +41,18 @@ if(ENABLE_ASIO)
         message(FATAL_ERROR
             "Asio not found. Install standalone Asio or set -DASIO_ROOT=/path/to/asio")
     endif()
+
     add_library(asio INTERFACE)
     target_include_directories(asio INTERFACE ${ASIO_INCLUDE_DIR})
-    target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
+    target_compile_definitions(asio INTERFACE
+        ASIO_STANDALONE
+        _WIN32_WINNT=0x0601
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(asio INTERFACE -Wno-language-extension-token)
+    endif()
+
+
     message(STATUS "Asio found: ${ASIO_INCLUDE_DIR}")
 endif()
 
@@ -67,6 +76,8 @@ add_subdirectory(sessions/s10)
 add_subdirectory(sessions/s11)
 add_subdirectory(sessions/s12)
 add_subdirectory(sessions/s13)
+add_subdirectory(sessions/s14)
+
 
 
 
