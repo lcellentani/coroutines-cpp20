@@ -57,6 +57,32 @@ if(ENABLE_ASIO)
 endif()
 
 # ---------------------------------------------------------------------------
+# Optional: AddressSanitizer
+# ---------------------------------------------------------------------------
+option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+
+if(ENABLE_ASAN)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        message(FATAL_ERROR "ENABLE_ASAN requires Clang or GCC")
+    endif()
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    if(WIN32)
+        # -static-libsan is unsupported on Windows/MSVC target; ASan is
+        # delivered as clang_rt.asan_dynamic-x86_64.dll — add LLVM bin to PATH.
+        add_link_options(-fsanitize=address)
+        # ASAN hooks malloc/free but NOT the MSVC debug CRT's _malloc_dbg/_free_dbg.
+        # Using /MDd causes false "bad-free" reports when STL static destructors run
+        # at process exit. Force the release CRT (/MD) so all allocations go through
+        # plain malloc/free that ASAN can track.
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+        message(STATUS "ASan enabled (Windows): forcing /MD (release CRT) to avoid "
+            "debug-heap conflicts. Add LLVM bin to PATH for clang_rt.asan_dynamic-x86_64.dll.")
+    else()
+        add_link_options(-fsanitize=address -static-libsan)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # Add include path for common utility headers
 include_directories(common)
 
@@ -78,6 +104,7 @@ add_subdirectory(sessions/s12)
 add_subdirectory(sessions/s13)
 add_subdirectory(sessions/s14)
 add_subdirectory(sessions/s15)
+add_subdirectory(sessions/s16)
 
 
 

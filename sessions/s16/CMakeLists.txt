@@ -1,6 +1,6 @@
 include(${PROJECT_SOURCE_DIR}/cmake/session.cmake)
 
 add_session(
-    TARGET  s15_exercise
-    SOURCES s15_exercise.cpp
+    TARGET  s16_exercise
+    SOURCES s16_exercise.cpp
 )

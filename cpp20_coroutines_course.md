@@ -155,7 +155,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 |---|-------|---------|--------|
 | 4.1 | Integrating with event loops — libuv and Asio patterns | S14 | ✅ Completed |
 | 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ✅ Completed |
-| 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ⬜ Not started |
+| 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ✅ Completed |
 | 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ⬜ Not started |
 | 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | ⬜ Not started |
 
@@ -556,6 +556,38 @@ Load project file and paste: `"Starting S15 from the beginning."`
 
 **Next session: S16** —  Memory management: coroutine frame size, custom allocators.
 Load project file and paste: `"Starting S16 from the beginning."`
+
+---
+
+### S16 —  Memory Management: Coroutine Frame Size, Custom Allocators
+**Date:** 2026-05-14
+**Curriculum:** 4.3
+**Status:** ✅ Complete
+
+**Completed:**
+- Identified the contents of a coroutine frame: resumption index, promise object, locals live across suspension points, saved temporaries, by-value parameter copies. Established that only live-across-suspension variables are in the frame — liveness analysis, not a blanket copy.
+- Measured the S13 Task coroutine frame at 112 bytes using an instrumented `operator new` on `promise_type`. Attributed the dominant cost to `std::function<void()>` (~32–40 bytes) plus time_point locals and the `Sleep` temporary.
+- Identified the two standard allocation hooks: `operator new` on `promise_type` (replaces the global allocator for that coroutine type), and allocator parameter injection via `std::allocator_arg_t` (passes a caller-supplied allocator to `operator new`).
+- Established three methods for measuring frame size: IR inspection (`alloca` / `??2@` grep), instrumented `operator new`, heap profiler.
+- Covered practical allocator patterns for game engines: per-frame arena (frame-lifetime coroutines), fixed-size pool (uniform coroutine types), tagged allocator (budget profiling).
+- Part A: Implemented instrumented `operator new` on `promise_type`, confirmed 112-byte frame.
+- Part B: Implemented `SimpleSlabAllocator` — intrusive free list, slab growth on demand, `operator new` / `operator delete` wired to `promise_type`. Identified two design issues: implicit single-size assumption (no enforcement), and shared static state across all `Task` coroutines regardless of frame size.
+- Iterated on `SimpleSlabAllocator`: Promoted `BlockSize` to a template parameter (`SlabAllocator<N>`) — each instantiation gets independent static state. Replaced `*(void**)` aliasing cast with `std::memcpy`. Added `assert(size <= BlockSize)` to catch misuse in debug builds. Named `kBlockSize = 128` as a documented constant on `promise_type`.
+- Slab cleanup: Identified the leak — `std::vector<std::byte*>` destructor doesn't `delete[]` the stored pointers. Evaluated four options: `unique_ptr` (automatic, zero-cost), explicit `shutdown()` (fits engine lifecycle), Nifty counter (correct but overkill), intentional no-cleanup with documentation (valid for shipping games). Applied Option 1 (`unique_ptr<std::byte[]>`) — one-line swap, safe under sanitizers.
+- ASan integration: Added `ENABLE_ASAN` option to root `CMakeLists.txt` with compiler guard. Resolved `clang_rt.asan_dynamic-x86_64.dll` not found error via `export PATH` in Git Bash. Noted `-static-libsan` as an alternative to avoid the DLL dependency entirely.
+- Undo Option 1 (`unique_ptr<std::byte[]>`) in favor of explicit `shutdown()` and fixed usage in main to unsure proper cleanup.
+
+**Key takeaways:**
+- Frame size is not `sizeof(promise_type)`. Locals and temporaries live in the frame too. Measure with instrumented `operator new` — don't guess.
+- `operator new` on `promise_type` is the clean integration point for custom allocators. Defining it disables HALO — but in real async code HALO never fires anyway.
+- Template the allocator on block size. Independent instantiations, independent free lists, type-system enforcement. `SlabAllocator<128>` and `SlabAllocator<256>` cannot corrupt each other.
+- `std::memcpy` is the correct way to read/write pointer values into raw byte storage. `*(void**)` works in practice but is a strict aliasing violation.
+- Static slab storage leaks unless wrapped in RAII. `unique_ptr<std::byte[]>` is the minimal correct fix. For engine code, an explicit `shutdown()` fits better with existing lifecycle patterns.
+- ASan on Windows with Clang requires the sanitizer runtime DLL on PATH, or `-static-libsan` to link it statically.
+- ASAN hooks `malloc`/`free`, but the MSVC debug CRT (msvcrtd/ucrtbased.dll) uses `_malloc_dbg`/`_free_dbg` internally for STL containers and ASAN doesn't see those allocations. At program exit, when the STL's static destructors free their bookkeeping through `free()`, ASAN intercepts the call, can't find the address in its own table, and reports "bad-free on wild pointer." The fix: force the release CRT (/MD) when ASAN is enabled, so all allocations go through plain `malloc`/`free` that ASAN can track.
+
+**Next session: S17** —  Cancellation patterns — cooperative cancellation without UB.
+Load project file and paste: `"Starting S17 from the beginning."`
 
 ---
 
