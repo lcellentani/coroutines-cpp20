@@ -187,7 +187,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 
 **Nothing left open.**
 
-**Next session:** S01 — *What is a coroutine? The "bookmarkable function" mental model.*
+**Next session:** S01 — What is a coroutine? The "bookmarkable function" mental model.
 Load this project file and paste: `"Starting S01 from the beginning."`
 
 ---
