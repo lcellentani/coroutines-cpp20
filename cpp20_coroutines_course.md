@@ -154,7 +154,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | # | Topic | Session | Status |
 |---|-------|---------|--------|
 | 4.1 | Integrating with event loops — libuv and Asio patterns | S14 | ✅ Completed |
-| 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ⬜ Not started |
+| 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ✅ Completed |
 | 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ⬜ Not started |
 | 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ⬜ Not started |
 | 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | ⬜ Not started |
@@ -531,6 +531,31 @@ Load project file and paste: `"Starting S14 from the beginning."`
 
 **Next session: S15** —  HALO: Heap Allocation Elision Optimization — what it is and when it fails.
 Load project file and paste: `"Starting S15 from the beginning."`
+
+---
+
+### S15 —  HALO: Heap Allocation Elision Optimization
+**Date:** 2026-05-14
+**Curriculum:** 4.2
+**Status:** ✅ Complete
+
+**Completed:**
+- Explained the HALO mechanism: when the compiler can prove the coroutine frame lifetime is bounded within the caller, it replaces the `operator new` call with `alloca` (stack allocation).
+- Identified the three conditions HALO requires: frame doesn't escape the caller, caller is not a coroutine that may suspend while the callee is live, frame size is statically known.
+- Identified the common HALO killers: handle escapes to global/heap, `initial_suspend` returning `suspend_always` (coroutine suspends before completing, frame must outlive the call), caller is a coroutine, custom `operator new` on promise type.
+- Established the correct grep for MSVC-target IR: `??2@YAPEAX_K@Z`, not `operator new` or `coro.alloc` (both are pre-lowering or non-MSVC symbols).
+- *Variant A* (`suspend_always`, global handle): IR showed `operator new` inside `simple()`. HALO blocked — suspension forces the frame to outlive the call.
+- *Variant B* (`suspend_never`, handle discarded): IR showed `alloca` inside `simple()`, no `operator new`. HALO fired. Remaining `??2@` calls in the file are `iostream`/`std::string` machinery, not the coroutine frame.
+
+**Key takeaways:**
+- HALO fires when the compiler sees a provably bounded frame lifetime. `suspend_never` on both `initial_suspend` and `final_suspend` is a necessary (not sufficient) condition — the handle must also not escape.
+- `alloca` in the IR is the signal HALO fired. Absence of `??2@YAPEAX_K@Z` inside the coroutine function body is the confirmation.
+- `operator new` appearing elsewhere in the file (string, iostream) is noise — scope the grep to the coroutine function.
+- HALO is not guaranteed by the standard. It's a quality-of-implementation optimization. Don't rely on it in production; design for heap allocation and provide a custom allocator if allocation pressure matters.
+- Real async patterns (Asio, job systems, anything that stores the handle) always block HALO by construction.
+
+**Next session: S16** —  Memory management: coroutine frame size, custom allocators.
+Load project file and paste: `"Starting S16 from the beginning."`
 
 ---
 

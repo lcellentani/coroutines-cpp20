@@ -1,17 +1,49 @@
-#include <asio.hpp>
-#include <asio/co_spawn.hpp>
-#include <asio/use_awaitable.hpp>
-#include <asio/steady_timer.hpp>
-#include <asio/detached.hpp>
+#include <coroutine>
 #include <iostream>
 
+struct Task {
+    struct promise_type {
+        Task get_return_object() {
+            return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
+        }
+
+        std::suspend_never initial_suspend() {
+            return {};
+        }
+
+        std::suspend_never final_suspend() noexcept {
+            return {};
+        }
+
+        void unhandled_exception() {
+            std::terminate();
+        }
+
+        void return_void() {}
+    };
+
+    std::coroutine_handle<promise_type> handle;
+
+    explicit Task(std::coroutine_handle<promise_type> handle) : handle(handle) {}
+};
+
+Task simple() {
+    std::cout << "simple() running...\n";
+    co_return;
+}
+
+//std::coroutine_handle<> g_handle;
 
 int main() {
-    asio::io_context io;
-
-    std::cout << "[main] io_context created\n";
+    std::cout << "Calling simple()...\n";
    
-    std::cout << "[main] coroutine finished, exiting main.\n";
+    simple();
+
+    //Task t2 = simple();
+    //g_handle = t2.handle;
+    //g_handle.resume();
+
+    std::cout << "Done.\n";
 
     return 0;
 }
