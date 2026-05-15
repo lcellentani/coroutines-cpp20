@@ -1,13 +1,30 @@
-#include <cassert>
 #include <chrono>
-#include <format>
 #include <coroutine>
+#include <exception>
 #include <functional>
 #include <iostream>
 #include <latch>
-#include <new>
-#include <vector>
+#include <stop_token>
 #include <thread>
+
+struct CancellationException {};
+
+struct CheckCancellation {
+    std::stop_token token;
+
+    bool await_ready() const noexcept {
+        return false;
+    }
+
+    void await_suspend(std::coroutine_handle<> handle) {
+        if (token.stop_requested()) {
+            throw CancellationException{};
+        }
+        handle.resume();
+    }
+
+    void await_resume() const noexcept {}
+};
 
 struct Sleep {
     std::chrono::milliseconds duration;
@@ -23,68 +40,23 @@ struct Sleep {
         }).detach();
     }
 
-    void await_resume() const noexcept {
-    }
+    void await_resume() const noexcept {}
 };
-
-template<size_t BlockSize>
-struct SlabAllocator {
-    static_assert(BlockSize >= sizeof(void*), "BlockSize must be at least pointer-sized to hold the free list link");
-
-    static inline void* free_list = nullptr;
-    static inline std::vector<std::byte*> slabs;
-    static constexpr size_t SlotsPerSlab = 1024;
-
-    static void* allocate(size_t size) {
-        assert(size <= BlockSize && "frame size exceeds pool block size");
-
-        if (!free_list) {
-            auto* block = new std::byte[BlockSize * SlotsPerSlab];
-            slabs.push_back(block);
-            for (size_t i = 0; i < SlotsPerSlab - 1; ++i) {
-                void* next = &block[(i + 1) * BlockSize];
-                std::memcpy(&block[i * BlockSize], &next, sizeof(void*));
-            }
-            void* null_ptr = nullptr;
-            std::memcpy(&block[(SlotsPerSlab - 1) * BlockSize], &null_ptr, sizeof(void*));
-            free_list = block;
-        }
-        
-        void* ptr = free_list;
-        void* next = nullptr;
-        std::memcpy(&next, ptr, sizeof(void*));
-        free_list = next;
-
-        return ptr;
-    }
-
-    static void deallocate(void* ptr) {
-        std::memcpy(ptr, &free_list, sizeof(void*));
-        free_list = ptr;
-    }
-
-    static void shutdown() {
-        free_list = nullptr;
-        for (auto* slab : slabs) {
-            delete[] slab;
-        }
-        slabs.clear();
-    }
-};
-
-static constexpr size_t kBlockSize = 128;
 
 struct Task {
     struct promise_type {
         std::function<void()> on_complete;
+        std::exception_ptr stored_exception;
 
         auto get_return_object() {
             return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
         }
 		
-        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always initial_suspend() { 
+            return {}; 
+        }
         
-        auto final_suspend() noexcept {
+        auto final_suspend() noexcept { 
             struct FinalAwaiter {
                 bool await_ready() const noexcept { return false; }
                 void await_suspend(std::coroutine_handle<promise_type> h) noexcept {
@@ -100,16 +72,18 @@ struct Task {
         void return_void() {}
 
         void unhandled_exception() {
-            std::terminate();
+            stored_exception = std::current_exception();
+            try {
+                std::rethrow_exception(stored_exception);
+            } catch (const CancellationException&) {
+                std::cout << "[Task]: cancelled\n";
+            } catch (...) {}
         }
 
-        void* operator new(size_t size) {
-            std::cout << std::format("[Slab] Allocating {} bytes\n", size);
-            return SlabAllocator<kBlockSize>::allocate(size);
-        }
-
-        void operator delete(void* ptr, size_t size) {
-            SlabAllocator<kBlockSize>::deallocate(ptr);
+        void result() {
+            if (stored_exception) {
+                std::rethrow_exception(stored_exception);
+            }
         }
     };
 
@@ -139,17 +113,30 @@ struct Task {
         }
         return *this;
     }
+
+    void get() {
+        handle.promise().result();
+    }
 };
 
-Task run(std::latch* completion_latch) {
-    auto before = std::chrono::steady_clock::now();
-    std::cout << "[coroutine] going to sleep\n";
+Task count_to(std::stop_token token, int n) {
+    for (int i = 0; i < n; ++i) {
+        co_await CheckCancellation{token};
+        std::cout << "[count_to]: step " << i << '\n';
+        co_await Sleep{std::chrono::milliseconds{100}};
+    }
 
-    co_await Sleep { std::chrono::milliseconds{200} };
+    std::cout << "[count_to]: done\n";
 
-    auto after = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(after - before);
-    std::cout << "[coroutine] woke up after " << elapsed.count() << "ms\n";
+    co_return;
+}
+
+Task run_with_timeout(std::stop_source& source, int ms_delay) {
+    std::cout << "[run_with_timeout]: starting timeout for " << ms_delay << "ms\n";
+    co_await Sleep{std::chrono::milliseconds{ms_delay}};
+    std::cout << "[run_with_timeout]: requesting stop after " << ms_delay << "ms\n";
+    
+    source.request_stop();
 
     co_return;
 }
@@ -157,19 +144,37 @@ Task run(std::latch* completion_latch) {
 int main() {
     std::cout << "[main] launching coroutine\n";
 
-    std::latch done(1);
-
     {
-        Task t = run(&done);
-        t.handle.promise().on_complete = [&done] { done.count_down(); };
-        t.handle.resume();
+        std::latch done(2);
 
-        std::cout << "[main] done, waiting for coroutine to finish...\n";
+        std::stop_source source;
+        std::stop_token token = source.get_token();
+
+        Task counter_task = count_to(token, 5);
+        counter_task.handle.promise().on_complete = [&done] { done.count_down(); };
+        
+        Task timeout_task = run_with_timeout(source, 200); // Timeout after 100ms
+        timeout_task.handle.promise().on_complete = [&done] { done.count_down(); };
+
+        try {
+            counter_task.handle.resume();
+        } catch (const std::exception& ex) {
+            std::cout << "[main] Caught exception from counter_task: " << ex.what() << '\n';
+            counter_task.handle = nullptr;
+        }
+        try {
+            timeout_task.handle.resume();
+        } catch (const std::exception& ex) {
+            std::cout << "[main] Caught exception from timeout_task: " << ex.what() << '\n';
+            timeout_task.handle = nullptr;
+        }
+
+        std::cout << "[main] Waiting for coroutines to finish...\n";
         done.wait();
-        std::cout << "[main] coroutine finished, exiting main.\n";
-    } // t destroyed here — frame returned to slab before shutdown
+        std::cout << "[main] Coroutines finished.\n";
+    }
 
-    SlabAllocator<kBlockSize>::shutdown();
+    std::cout << "[main] coroutine finished, exiting main.\n";
 
     return 0;
 }

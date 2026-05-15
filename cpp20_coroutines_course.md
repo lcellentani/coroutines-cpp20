@@ -156,7 +156,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 4.1 | Integrating with event loops — libuv and Asio patterns | S14 | ✅ Completed |
 | 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ✅ Completed |
 | 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ✅ Completed |
-| 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ⬜ Not started |
+| 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ✅ Completed |
 | 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | ⬜ Not started |
 
 ---
@@ -588,6 +588,33 @@ Load project file and paste: `"Starting S16 from the beginning."`
 
 **Next session: S17** —  Cancellation patterns — cooperative cancellation without UB.
 Load project file and paste: `"Starting S17 from the beginning."`
+
+---
+
+### S17 —  Cancellation Patterns: Cooperative Cancellation Without UB
+**Date:** 2026-05-15
+**Curriculum:** 4.4
+**Status:** ✅ Complete
+
+**Completed:**
+- Established the three components of a cancellation system: token (shared signal), check point (awaitable that reads the token), propagation contract (exception vs. return value).
+- Covered `std::stop_source` / `std::stop_token` as the standard library primitive: ref-counted, thread-safe, supports `stop_callback` for cancelling in-flight I/O.
+- Explained the handle-destruction path: `coroutine_handle::destroy()` is safe only on a suspended coroutine; locals in the frame must be RAII-managed or they leak.
+- Identified the cancellation propagation problem in chains (poll at each point vs. structured scope vs. abandon+timeout).
+- Built `CheckCancellation` awaitable: exception-based, synchronous throw from `await_suspend` if `stop_requested()`.
+- First attempt ran `count_to` to completion before `run_with_timeout` started — root cause: `await_suspend` calling `handle.resume()` inline (synthetic suspension, no real yield) and `run_with_timeout` reading the token instead of writing it.
+- Fixed: added `Sleep{100ms}` between steps in `count_to` (real yield), changed `run_with_timeout` to take `stop_source&` and call `request_stop()`, added cancellation logging in `unhandled_exception`.
+- Final output shows steps 0–2, timeout fires at 200ms, cancellation detected at next check point, coroutine exits cleanly via exception path.
+
+**Key takeaways:**
+- Cooperative cancellation stops the coroutine at the next check point, not immediately. Check point placement is a design decision — granularity trades off response latency against code verbosity.
+- `stop_source` is the write side, `stop_token` is the read side. The canceller holds the source; the cancellable coroutine holds the token.
+- Throwing from `await_suspend` is legal when the throw is synchronous. If resumption happens on a background thread, exceptions must not escape the thread — use return-value propagation instead.
+- `unhandled_exception` must store or handle the exception. Ignoring it calls `std::terminate`.
+- `final_suspend` fires even after an unhandled exception — `on_complete` callbacks and latch signals remain reliable.
+
+**Next session: S18** —  Capstone Part 1: Async task runner with concurrent interdependent coroutines.
+Load project file and paste: `"Starting S18 from the beginning."`
 
 ---
 
