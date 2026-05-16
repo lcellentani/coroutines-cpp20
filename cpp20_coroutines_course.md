@@ -644,6 +644,37 @@ Load project file and paste: `"Starting S19 from the beginning."`
 
 ---
 
+### S19 —  Capstone Part 2: Fan-in Dependencies and Parallel Branches
+**Date:** 2026-05-16
+**Curriculum:** 4.5 (part 2 of 3)
+**Status:** ✅ Complete
+
+**Completed:**
+- Extended the S18 task runner with fan-in dependency support.
+- Implemented Option A (`WaitFor` sequential loop): `build_material` awaits each dep in order; works correctly because `await_ready` short-circuits when deps are already complete.
+- Implemented Option B (`WaitForAll` atomic counter): counter initialised to dep count; async callbacks decrement it; last to reach zero resumes the waiter. Inline decrements (already-complete deps) handled separately from async callbacks to avoid resuming inside `await_suspend`.
+- Added mutex-protected logging with timestamps to compare both options.
+- Observed that both options produce identical latency when the waiter arrives after all deps complete — the sequential loop falls through with no actual suspension.
+
+**Bugs caught and fixed:**
+- `initializer_list` dangling reference: the backing array dies at the call site; fixed by taking `std::vector<TaskId>` by value.
+- `await_suspend` resuming inside itself: calling `handle.resume()` from within `await_suspend` before it returns is UB; fixed by splitting inline vs async paths and using symmetric transfer for the synchronous case.
+- `deps.size()` evaluated after move: `static_cast<int>(deps.size())` on an already-moved vector returns 0; fixed by capturing size before the move.
+
+**Known limitation (noted, not fixed):**
+- Race in `WaitForAll::await_suspend` between the post-loop `counter == 0` check and async callbacks: if all deps complete between the loop ending and the check, both the callback path and the symmetric-transfer path could attempt to resume the handle. Safe in practice with non-zero sleep durations; requires `fetch_sub`-based sentinel for production correctness.
+
+**Key takeaways:**
+- `initializer_list` and `std::function&` are both lifetime traps in coroutines. Parameters that cross a suspension point must be owned by the frame — use `std::vector`, `std::string`, or value captures.
+- The counter lives in the awaitable (coroutine frame), not the runner — the frame is heap-allocated and survives suspension, giving the counter a safe lifetime without runner-side bookkeeping.
+- Option A and Option B converge when the waiter arrives late. Option B's advantage is minimum latency when the waiter suspends genuinely and the last dep wakes it immediately.
+- Symmetric transfer (`return handle` from `await_suspend`) is the correct way to resume inline — it avoids stack growth and respects the coroutine machinery's state.
+
+**Next session: S20** —  Capstone Part 3: thread pool, task cancellation integration, and course wrap-up.
+Load project file and paste: `"Starting S20 from the beginning."`
+
+---
+
 ## 🔧 Reference: Status Legend
 
 | Symbol | Meaning |
