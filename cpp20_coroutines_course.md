@@ -157,7 +157,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ✅ Completed |
 | 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ✅ Completed |
 | 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ✅ Completed |
-| 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | ⬜ Not started |
+| 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | 🔄 In progress |
 
 ---
 
@@ -615,6 +615,32 @@ Load project file and paste: `"Starting S17 from the beginning."`
 
 **Next session: S18** —  Capstone Part 1: Async task runner with concurrent interdependent coroutines.
 Load project file and paste: `"Starting S18 from the beginning."`
+
+---
+
+### S18 —  Capstone Part 1: Async Task Runner — Foundation
+**Date:** 2026-05-16
+**Curriculum:** 4.5 (part 1 of 3)
+**Status:** ✅ Complete
+
+**Completed:**
+- Designed the task runner from scratch: `TaskId`, `Task<void>`, `WaitFor` awaitable, `TaskRunner` with mutex-protected state.
+- Resolved the forward declaration cycle: `WaitFor` references `TaskRunner`, `Task::promise_type` references `TaskRunner` — broken by forward-declaring `TaskRunner` and moving method bodies out of line after the full definition.
+- Resolved the pointer stability problem: `promise_type` holds `runner_` and `id_` directly; `Task::set_runner()` writes into the promise via the handle. No raw `Task*` stored anywhere.
+- Implemented `try_register_waiter()` as an atomic check-then-register under the mutex — eliminates the race where a task completes between the `await_ready` check and the `await_suspend` registration.
+- Implemented `mark_complete()`: inserts into `completed_`, moves (not copies) the waiters list out under the lock, then resumes handles after releasing the lock to avoid deadlock on re-entrant `try_register_waiter` calls.
+- Implemented `run_all()`: one thread per task, each thread resumes its task's handle, joined before returning.
+- Verified end-to-end with a three-task linear pipeline: `load_texture` → `decompress` → `generate_mips`. Causal ordering enforced correctly across all runs.
+
+**Key takeaways:**
+- `final_suspend` is the correct hook for completion signalling — it fires after the coroutine body finishes, before the frame is destroyed, giving the promise a safe window to notify the runner.
+- Moving the waiters list out of the map before resuming is not optional — resuming under the lock causes deadlock when the resumed coroutine re-enters the runner.
+- In a linear dependency chain, the completing task's thread carries all subsequent work. Concurrency only emerges from independent branches — the subject of S19.
+- `mutable` on `state_mutex_` is correct: `is_complete` is logically const even though locking has physical side effects.
+- `[[maybe_unused]]` is the right tool for API-consistency parameters that a specific implementation doesn't need.
+
+**Next session: S19** —  Capstone Part 2: Fan-in dependencies and parallel branches.
+Load project file and paste: `"Starting S19 from the beginning."`
 
 ---
 
