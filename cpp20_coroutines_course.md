@@ -510,7 +510,7 @@ Load project file and paste: `"Starting S14 from the beginning."`
 
 ---
 
-### S14 —  Integrating with Event Loops: Asio Patterns
+### S14 — Integrating with Event Loops: Asio Patterns
 **Date:** 2026-05-13
 **Curriculum:** 4.1
 **Status:** ✅ Complete
@@ -534,7 +534,7 @@ Load project file and paste: `"Starting S15 from the beginning."`
 
 ---
 
-### S15 —  HALO: Heap Allocation Elision Optimization
+### S15 — HALO: Heap Allocation Elision Optimization
 **Date:** 2026-05-14
 **Curriculum:** 4.2
 **Status:** ✅ Complete
@@ -559,7 +559,7 @@ Load project file and paste: `"Starting S16 from the beginning."`
 
 ---
 
-### S16 —  Memory Management: Coroutine Frame Size, Custom Allocators
+### S16 — Memory Management: Coroutine Frame Size, Custom Allocators
 **Date:** 2026-05-14
 **Curriculum:** 4.3
 **Status:** ✅ Complete
@@ -591,7 +591,7 @@ Load project file and paste: `"Starting S17 from the beginning."`
 
 ---
 
-### S17 —  Cancellation Patterns: Cooperative Cancellation Without UB
+### S17 — Cancellation Patterns: Cooperative Cancellation Without UB
 **Date:** 2026-05-15
 **Curriculum:** 4.4
 **Status:** ✅ Complete
@@ -618,7 +618,7 @@ Load project file and paste: `"Starting S18 from the beginning."`
 
 ---
 
-### S18 —  Capstone Part 1: Async Task Runner — Foundation
+### S18 — Capstone Part 1: Async Task Runner — Foundation
 **Date:** 2026-05-16
 **Curriculum:** 4.5 (part 1 of 3)
 **Status:** ✅ Complete
@@ -644,7 +644,7 @@ Load project file and paste: `"Starting S19 from the beginning."`
 
 ---
 
-### S19 —  Capstone Part 2: Fan-in Dependencies and Parallel Branches
+### S19 — Capstone Part 2: Fan-in Dependencies and Parallel Branches
 **Date:** 2026-05-16
 **Curriculum:** 4.5 (part 2 of 3)
 **Status:** ✅ Complete
@@ -672,6 +672,35 @@ Load project file and paste: `"Starting S19 from the beginning."`
 
 **Next session: S20** —  Capstone Part 3: thread pool, task cancellation integration, and course wrap-up.
 Load project file and paste: `"Starting S20 from the beginning."`
+
+---
+
+### S20 — Capstone Part 3: Thread Pool, Cancellation Integration, and Course Wrap-Up
+**Date:** 2026-05-17
+**Curriculum:** 4.5 (part 3 of 3)
+**Status:** ✅ Complete
+
+**Completed:**
+- Replaced the one-thread-per-task model in `run_all` with a fixed thread pool (`WorkQueue` + N worker threads looping on `queue_.pop`).
+- Added `post(handle)` to `TaskRunner`; all resumptions — from `mark_complete` and from `WaitForAll` callbacks — now go through the pool instead of calling `handle.resume()` directly.
+- Added `std::latch` to `run_all` for clean shutdown: initialised to task count, decremented in `mark_complete`, run_all blocks on `latch_->wait()` then shuts down the queue and joins workers.
+- Added `std::stop_source` to `TaskRunner` with `cancel()` and `get_stop_token()`.
+- Threaded `std::stop_token` into `WaitFor` and `WaitForAll` at construction time via `wait_for()` and `wait_for_all()`.
+- Added cancellation checks in both `await_ready` (before suspension) and `await_resume` (after resumption) — the two-point pattern that covers cancellation requested both before and during suspension.
+- Verified: canceller fires at ~92ms; `build_material_atomic` resumes after the last dep, `throws CancellationException` in `await_resume`, exits via `unhandled_exception`, `final_suspend` fires, latch counts down, runner shuts down cleanly.
+
+**Bugs caught and fixed:**
+- Canceller sleep duration was `std::chrono::seconds{80}` instead of `milliseconds{80}` — canceller fired 80 seconds late, program appeared to hang.
+- First attempt at cancellation threw from inside the `WaitForAll` callback — a plain `std::function` on a worker thread stack, outside coroutine machinery. Exception escaped `handle.resume()`, crashed the process. Fixed by moving the throw to `await_resume`, which runs on the coroutine stack.
+
+**Key takeaways:**
+- The worker loop is three lines: declare a handle, loop on `queue_.pop`, call `handle.resume()`. The pool has no knowledge of tasks, promises, or IDs.
+- `std::latch` is the right primitive for "wait until N things complete" — cleaner than a condition variable for this use case.
+- Cooperative cancellation has two check points: `await_ready` (catches pre-suspension cancellation) and `await_resume` (catches cancellation that arrived while suspended). One without the other leaves a gap.
+- You cannot throw from a callback invoked outside coroutine machinery. Exceptions must be thrown from within the coroutine's own execution stack — `await_ready`, `await_resume`, or the coroutine body itself.
+- Tasks with no `co_await` after cancellation is requested will always run to completion. Check point granularity is a design decision the coroutine author controls, not the runner.
+
+**Course status:** ✅ All 20 sessions complete. All four phases complete. Capstone complete.
 
 ---
 

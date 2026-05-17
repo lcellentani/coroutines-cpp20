@@ -108,7 +108,7 @@ add_subdirectory(sessions/s16)
 add_subdirectory(sessions/s17)
 add_subdirectory(sessions/s18)
 add_subdirectory(sessions/s19)
-#add_subdirectory(sessions/s20)
+add_subdirectory(sessions/s20)
 
 
 
