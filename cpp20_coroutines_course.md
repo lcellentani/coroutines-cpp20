@@ -157,7 +157,7 @@ Update the lesson file at the end of each chat within the lesson. When the lesso
 | 4.2 | HALO — Heap Allocation Elision Optimization: what it is and when it fails | S15 | ✅ Completed |
 | 4.3 | Memory management: coroutine frame size, custom allocators | S16 | ✅ Completed |
 | 4.4 | Cancellation patterns — cooperative cancellation without UB | S17 | ✅ Completed |
-| 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | 🔄 In progress |
+| 4.5 | **Capstone:** Async task runner — concurrent interdependent coroutines | S18–S20 | ✅ Completed |
 
 ---
 
